@@ -111,7 +111,8 @@ func main() {
 		return
 	}
 
-	if err := loadCredentialFiles(&opts); err != nil {
+	err := loadCredentialFiles(&opts)
+	if err != nil {
 		ctx.Fatalf("Failed to load MongoDB credentials: %v", err)
 	}
 
