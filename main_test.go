@@ -17,6 +17,8 @@ package main
 
 import (
 	"net"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -58,6 +60,107 @@ func TestParseURIList(t *testing.T) {
 	for test, expected := range tests {
 		actual := parseURIList(strings.Split(test, ","), logger, false)
 		assert.Equal(t, expected, actual)
+	}
+}
+
+func TestLoadCredentialFiles(t *testing.T) {
+	t.Parallel()
+
+	dir := t.TempDir()
+	userFile := filepath.Join(dir, "user")
+	passwordFile := filepath.Join(dir, "password")
+	assert.NoError(t, os.WriteFile(userFile, []byte(" file-user\n"), 0o600))
+	assert.NoError(t, os.WriteFile(passwordFile, []byte("\tfile-password\r\n"), 0o600))
+
+	tests := []struct {
+		name             string
+		opts             GlobalFlags
+		expectedUser     string
+		expectedPassword string
+	}{
+		{
+			name: "files override direct values",
+			opts: GlobalFlags{
+				User:         "direct-user",
+				UserFile:     userFile,
+				Password:     "direct-password",
+				PasswordFile: passwordFile,
+			},
+			expectedUser:     "file-user",
+			expectedPassword: "file-password",
+		},
+		{
+			name: "user file only",
+			opts: GlobalFlags{
+				User:     "direct-user",
+				UserFile: userFile,
+				Password: "direct-password",
+			},
+			expectedUser:     "file-user",
+			expectedPassword: "direct-password",
+		},
+		{
+			name: "password file only",
+			opts: GlobalFlags{
+				User:         "direct-user",
+				Password:     "direct-password",
+				PasswordFile: passwordFile,
+			},
+			expectedUser:     "direct-user",
+			expectedPassword: "file-password",
+		},
+		{
+			name: "no files",
+			opts: GlobalFlags{
+				User:     "direct-user",
+				Password: "direct-password",
+			},
+			expectedUser:     "direct-user",
+			expectedPassword: "direct-password",
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			t.Parallel()
+
+			opts := test.opts
+			assert.NoError(t, loadCredentialFiles(&opts))
+			assert.Equal(t, test.expectedUser, opts.User)
+			assert.Equal(t, test.expectedPassword, opts.Password)
+		})
+	}
+}
+
+func TestLoadCredentialFilesErrors(t *testing.T) {
+	t.Parallel()
+
+	missingFile := filepath.Join(t.TempDir(), "missing")
+	tests := []struct {
+		name          string
+		opts          GlobalFlags
+		expectedError string
+	}{
+		{
+			name:          "missing user file",
+			opts:          GlobalFlags{UserFile: missingFile},
+			expectedError: "failed to read MongoDB user file",
+		},
+		{
+			name:          "missing password file",
+			opts:          GlobalFlags{PasswordFile: missingFile},
+			expectedError: "failed to read MongoDB password file",
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			t.Parallel()
+
+			err := loadCredentialFiles(&test.opts)
+			assert.ErrorContains(t, err, test.expectedError)
+			assert.ErrorContains(t, err, missingFile)
+		})
 	}
 }
 
