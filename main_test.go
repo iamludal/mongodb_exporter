@@ -25,6 +25,7 @@ import (
 	"github.com/foxcpp/go-mockdns"
 	"github.com/prometheus/common/promslog"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"github.com/percona/mongodb_exporter/internal/tu"
 )
@@ -69,8 +70,8 @@ func TestLoadCredentialFiles(t *testing.T) {
 	dir := t.TempDir()
 	userFile := filepath.Join(dir, "user")
 	passwordFile := filepath.Join(dir, "password")
-	assert.NoError(t, os.WriteFile(userFile, []byte(" file-user\n"), 0o600))
-	assert.NoError(t, os.WriteFile(passwordFile, []byte("\tfile-password\r\n"), 0o600))
+	require.NoError(t, os.WriteFile(userFile, []byte(" file-user\n"), 0o600))
+	require.NoError(t, os.WriteFile(passwordFile, []byte("\tfile-password\r\n"), 0o600))
 
 	tests := []struct {
 		name             string
@@ -109,15 +110,6 @@ func TestLoadCredentialFiles(t *testing.T) {
 			expectedUser:     "direct-user",
 			expectedPassword: "file-password",
 		},
-		{
-			name: "no files",
-			opts: GlobalFlags{
-				User:     "direct-user",
-				Password: "direct-password",
-			},
-			expectedUser:     "direct-user",
-			expectedPassword: "direct-password",
-		},
 	}
 
 	for _, test := range tests {
@@ -125,11 +117,20 @@ func TestLoadCredentialFiles(t *testing.T) {
 			t.Parallel()
 
 			opts := test.opts
-			assert.NoError(t, loadCredentialFiles(&opts))
+			require.NoError(t, loadCredentialFiles(&opts))
 			assert.Equal(t, test.expectedUser, opts.User)
 			assert.Equal(t, test.expectedPassword, opts.Password)
 		})
 	}
+}
+
+func TestLoadCredentialFilesNoFiles(t *testing.T) {
+	t.Parallel()
+
+	opts := GlobalFlags{User: "direct-user", Password: "direct-password"}
+	require.NoError(t, loadCredentialFiles(&opts))
+	assert.Equal(t, "direct-user", opts.User)
+	assert.Equal(t, "direct-password", opts.Password)
 }
 
 func TestLoadCredentialFilesErrors(t *testing.T) {
@@ -158,7 +159,7 @@ func TestLoadCredentialFilesErrors(t *testing.T) {
 			t.Parallel()
 
 			err := loadCredentialFiles(&test.opts)
-			assert.ErrorContains(t, err, test.expectedError)
+			require.ErrorContains(t, err, test.expectedError)
 			assert.ErrorContains(t, err, missingFile)
 		})
 	}

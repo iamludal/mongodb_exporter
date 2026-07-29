@@ -174,7 +174,7 @@ func readCredentialFile(path string) (string, error) {
 
 	contents, err := os.ReadFile(filepath.Clean(path))
 	if err != nil {
-		return "", err
+		return "", fmt.Errorf("read credential file: %w", err)
 	}
 
 	return strings.TrimSpace(string(contents)), nil
